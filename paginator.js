@@ -165,7 +165,8 @@ const setSelectionTo = (target, collapse) => {
         range.selectNode(target)
     }
     if (range) {
-        const sel = range.startContainer.ownerDocument.defaultView.getSelection()
+        const doc = range.startContainer?.ownerDocument ?? (range.startContainer?.nodeType === 9 ? range.startContainer : null)
+        const sel = doc?.defaultView?.getSelection()
         if (sel) {
             sel.removeAllRanges()
             if (collapse === -1) range.collapse(true)
@@ -176,21 +177,24 @@ const setSelectionTo = (target, collapse) => {
 }
 
 const getDirection = doc => {
-    const { defaultView } = doc
+    const defaultView = doc?.defaultView
+    if (!doc || !defaultView || !doc.body) return { vertical: false, rtl: false }
     const { writingMode, direction } = defaultView.getComputedStyle(doc.body)
     const vertical = writingMode === 'vertical-rl'
         || writingMode === 'vertical-lr'
-    const rtl = doc.body.dir === 'rtl'
+    const rtl = doc.body?.dir === 'rtl'
         || direction === 'rtl'
-        || doc.documentElement.dir === 'rtl'
+        || doc.documentElement?.dir === 'rtl'
     return { vertical, rtl }
 }
 
 const getBackground = doc => {
-    const bodyStyle = doc.defaultView.getComputedStyle(doc.body)
+    const defaultView = doc?.defaultView
+    if (!doc || !defaultView || !doc.body) return ''
+    const bodyStyle = defaultView.getComputedStyle(doc.body)
     return bodyStyle.backgroundColor === 'rgba(0, 0, 0, 0)'
         && bodyStyle.backgroundImage === 'none'
-        ? doc.defaultView.getComputedStyle(doc.documentElement).background
+        ? (defaultView.getComputedStyle(doc.documentElement)?.background ?? '')
         : bodyStyle.background
 }
 
@@ -342,6 +346,7 @@ class View {
         const { width, height, margin } = this.#layout
         const vertical = this.#vertical
         const doc = this.document
+        if (!doc?.defaultView || !doc.body) return
         for (const el of doc.body.querySelectorAll('img, svg, video')) {
             // preserve max size if they are already set
             const { maxHeight, maxWidth } = doc.defaultView.getComputedStyle(el)
@@ -1090,7 +1095,7 @@ export class Paginator extends HTMLElement {
         return this.goTo({ index })
     }
     getContents() {
-        if (this.#view) return [{
+        if (this.#view?.document) return [{
             index: this.#index,
             overlayer: this.#view.overlayer,
             doc: this.#view.document,
@@ -1109,14 +1114,16 @@ export class Paginator extends HTMLElement {
         } else $style.textContent = styles
 
         // NOTE: needs `requestAnimationFrame` in Chromium
-        requestAnimationFrame(() =>
-            this.#background.style.background = getBackground(this.#view.document))
+        requestAnimationFrame(() => {
+            const bg = getBackground(this.#view?.document)
+            if (bg && this.#background) this.#background.style.background = bg
+        })
 
         // needed because the resize observer doesn't work in Firefox
         this.#view?.document?.fonts?.ready?.then(() => this.#view.expand())
     }
     focusView() {
-        this.#view.document.defaultView.focus()
+        this.#view?.document?.defaultView?.focus()
     }
     destroy() {
         this.#observer.unobserve(this)
@@ -1127,4 +1134,6 @@ export class Paginator extends HTMLElement {
     }
 }
 
-customElements.define('foliate-paginator', Paginator)
+if (!customElements.get('foliate-paginator')) {
+    customElements.define('foliate-paginator', Paginator)
+}

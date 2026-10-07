@@ -443,7 +443,7 @@ export class View extends HTMLElement {
             return { index, anchor }
         }
     }
-    resolveNavigation(target) {
+    async resolveNavigation(target) {
         try {
             if (typeof target === 'number') return { index: target }
             if (typeof target.fraction === 'number') {
@@ -451,14 +451,14 @@ export class View extends HTMLElement {
                 return { index, anchor }
             }
             if (CFI.isCFI.test(target)) return this.resolveCFI(target)
-            return this.book.resolveHref(target)
+            return await this.book.resolveHref(target)
         } catch (e) {
             console.error(e)
             console.error(`Could not resolve target ${target}`)
         }
     }
     async goTo(target) {
-        const resolved = this.resolveNavigation(target)
+        const resolved = await this.resolveNavigation(target)
         try {
             await this.renderer.goTo(resolved)
             this.history.pushState(target)
@@ -485,7 +485,7 @@ export class View extends HTMLElement {
     }
     deselect() {
         for (const { doc } of this.renderer.getContents())
-            doc.defaultView.getSelection().removeAllRanges()
+            doc?.defaultView?.getSelection()?.removeAllRanges()
     }
     getSectionFractions() {
         return (this.#sectionProgress?.sectionFractions ?? [])
@@ -594,4 +594,6 @@ export class View extends HTMLElement {
     }
 }
 
-customElements.define('foliate-view', View)
+if (!customElements.get('foliate-view')) {
+    customElements.define('foliate-view', View)
+}

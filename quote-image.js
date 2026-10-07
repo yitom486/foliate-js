@@ -49,6 +49,7 @@ const html = `<style>
 </main>`
 
 // TODO: lang, vertical writing
+if (!customElements.get('foliate-quoteimage')) {
 customElements.define('foliate-quoteimage', class extends HTMLElement {
     #root = this.attachShadow({ mode: 'closed' })
     constructor() {
@@ -84,3 +85,4 @@ customElements.define('foliate-quoteimage', class extends HTMLElement {
         })
     }
 })
+}
