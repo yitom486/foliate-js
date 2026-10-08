@@ -887,8 +887,11 @@ export class Paginator extends HTMLElement {
     }
     async #scrollToRect(rect, reason) {
         if (this.scrolled) {
-            const offset = this.#getRectMapper()(rect).left - this.#margin
-            return this.#scrollTo(offset, reason)
+            const containerHeight = this.#container?.clientHeight || this.size
+            const centerAdjust = (containerHeight / 2) - ((rect.height || 0) / 2)
+            const targetPos = this.#getRectMapper()(rect).left - this.#margin - centerAdjust
+            const offset = Math.max(0, targetPos)
+            return this.#scrollTo(offset, reason, true)
         }
         const offset = this.#getRectMapper()(rect).left
         return this.#scrollToPage(Math.floor(offset / this.size) + (this.#rtl ? -1 : 1), reason)
@@ -903,6 +906,14 @@ export class Paginator extends HTMLElement {
         }
         // FIXME: vertical-rl only, not -lr
         if (this.scrolled && this.#vertical) offset = -offset
+        if (smooth) {
+            try {
+                element.scrollTo({ [scrollProp]: offset, behavior: 'smooth' })
+                this.#scrollBounds = [offset, this.atStart ? 0 : size, this.atEnd ? 0 : size]
+                this.#afterScroll(reason)
+                return
+            } catch {}
+        }
         if ((reason === 'snap' || smooth) && this.hasAttribute('animated')) return animate(
             element[scrollProp], offset, 300, easeOutQuad,
             x => element[scrollProp] = x,
@@ -921,7 +932,8 @@ export class Paginator extends HTMLElement {
         return this.#scrollTo(offset, reason, smooth)
     }
     async scrollToAnchor(anchor, select) {
-        return this.#scrollToAnchor(anchor, select ? 'selection' : 'navigation')
+        const reason = typeof select === 'string' ? select : (select ? 'selection' : 'navigation')
+        return this.#scrollToAnchor(anchor, reason)
     }
     async #scrollToAnchor(anchor, reason = 'anchor') {
         this.#anchor = anchor
@@ -930,8 +942,14 @@ export class Paginator extends HTMLElement {
         if (rects) {
             // when the start of the range is immediately after a hyphen in the
             // previous column, there is an extra zero width rect in that column
-            const rect = Array.from(rects)
+            let rect = Array.from(rects)
                 .find(r => r.width > 0 && r.height > 0) || rects[0]
+            if (!rect && anchor?.startContainer) {
+                const parent = anchor.startContainer instanceof Element
+                    ? anchor.startContainer
+                    : anchor.startContainer.parentElement
+                if (parent) rect = parent.getBoundingClientRect()
+            }
             if (!rect) return
             await this.#scrollToRect(rect, reason)
             return
